@@ -94,10 +94,16 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: artifacts
+      - name: Package artifacts
+        run: |
+          mkdir -p release
+          zip -j release/windows.zip artifacts/windows/*
+          zip -j release/macos.zip artifacts/macos/*
+          zip -j release/linux.zip artifacts/linux/*
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            artifacts/windows/**
-            artifacts/macos/**
-            artifacts/linux/**
+            release/windows.zip
+            release/macos.zip
+            release/linux.zip
