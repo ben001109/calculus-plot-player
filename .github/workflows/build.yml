@@ -3,7 +3,10 @@ name: Build
 on:
   push:
     branches: [ "main" ]
+    tags: [ "v*.*.*" ]
   workflow_dispatch: {}
+permissions:
+  contents: write
 
 jobs:
   build-windows:
@@ -56,3 +59,45 @@ jobs:
         with:
           name: macos
           path: dist/*
+
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install pyinstaller
+      - name: Build executables
+        run: |
+          if [ ! -f "frames.json" ]; then
+            echo "frames.json not found. Run: python3 build_frames.py"
+            exit 1
+          fi
+          pyinstaller --onefile --add-data "frames.json:." --add-data "index.html:." --add-data "geogebra.html:." --name "app_desmos" app_desmos.py
+          pyinstaller --onefile --add-data "frames.json:." --add-data "index.html:." --add-data "geogebra.html:." --name "app_geogebra" app_geogebra.py
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux
+          path: dist/*
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [build-windows, build-macos, build-linux]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            artifacts/windows/**
+            artifacts/macos/**
+            artifacts/linux/**
