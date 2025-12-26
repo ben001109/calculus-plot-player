@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>GeoGebra | Bad Apple</title>
+    <script src="https://www.geogebra.org/apps/deployggb.js"></script>
+    <style>
+      html, body { margin: 0; padding: 0; width: 100%; height: 100%; }
+      #ggb { width: 100%; height: 100%; }
+    </style>
+  </head>
+  <body>
+    <div id="ggb"></div>
+    <script>
+      var ggbApplet = null;
+      var frameIndex = 0;
+      var currentObjects = [];
+      var latexFrames = [];
+      var fps = 24;
+      var sampleStep = 1;
+      var playTimer = null;
+
+      function hslToRgb(h, s, l) {
+        s /= 100;
+        l /= 100;
+        var c = (1 - Math.abs(2 * l - 1)) * s;
+        var x = c * (1 - Math.abs((h / 60) % 2 - 1));
+        var m = l - c / 2;
+        var r = 0, g = 0, b = 0;
+        if (0 <= h && h < 60) { r = c; g = x; b = 0; }
+        else if (60 <= h && h < 120) { r = x; g = c; b = 0; }
+        else if (120 <= h && h < 180) { r = 0; g = c; b = x; }
+        else if (180 <= h && h < 240) { r = 0; g = x; b = c; }
+        else if (240 <= h && h < 300) { r = x; g = 0; b = c; }
+        else { r = c; g = 0; b = x; }
+        return [
+          Math.round((r + m) * 255),
+          Math.round((g + m) * 255),
+          Math.round((b + m) * 255)
+        ];
+      }
+
+      function colorForIndex(i) {
+        var hue = (i * 47) % 360;
+        return hslToRgb(hue, 70, 45);
+      }
+
+      function splitXY(expr) {
+        var text = expr.trim();
+        if (text[0] === '(' && text[text.length - 1] === ')') {
+          text = text.slice(1, -1);
+        }
+        var depth = 0;
+        for (var i = 0; i < text.length; i++) {
+          var ch = text[i];
+          if (ch === '(') depth++;
+          else if (ch === ')') depth--;
+          else if (ch === ',' && depth === 0) {
+            return [text.slice(0, i), text.slice(i + 1)];
+          }
+        }
+        return [text, "0"];
+      }
+
+      function normalizeExpr(expr) {
+        return expr
+          .replace(/\)\s*\(/g, ')*(')
+          .replace(/([0-9)])\s*\(/g, '$1*(')
+          .replace(/([a-zA-Z])\s*\(/g, '$1*(')
+          .replace(/([0-9)])\s*([a-zA-Z])/g, '$1*$2')
+          .replace(/([a-zA-Z])\s*([0-9])/g, '$1*$2');
+      }
+
+      function clearFrame() {
+        for (var i = 0; i < currentObjects.length; i++) {
+          ggbApplet.deleteObject(currentObjects[i]);
+        }
+        currentObjects = [];
+      }
+
+      function drawFrame(frame) {
+        clearFrame();
+        for (var i = 0; i < frame.length; i += sampleStep) {
+          var expr = frame[i];
+          var parts = splitXY(expr);
+          var xExpr = normalizeExpr(parts[0]);
+          var yExpr = normalizeExpr(parts[1]);
+          var name = "c" + i;
+          var cmd = name + "=Curve[" + xExpr + "," + yExpr + ",t,0,1]";
+          ggbApplet.evalCommand(cmd);
+          var rgb = colorForIndex(i + 1);
+          ggbApplet.setColor(name, rgb[0], rgb[1], rgb[2]);
+          currentObjects.push(name);
+        }
+      }
+
+      function tick() {
+        if (frameIndex < latexFrames.length) {
+          drawFrame(latexFrames[frameIndex]);
+          frameIndex++;
+        }
+      }
+
+      function play() {
+        if (!latexFrames.length) {
+          return;
+        }
+        if (playTimer) {
+          clearInterval(playTimer);
+        }
+        playTimer = setInterval(tick, 1000 / fps);
+      }
+
+      function pause() {
+        if (playTimer) {
+          clearInterval(playTimer);
+          playTimer = null;
+        }
+      }
+
+      function showFrame(n) {
+        if (!latexFrames.length) {
+          return;
+        }
+        pause();
+        if (n < 0 || n >= latexFrames.length) {
+          return;
+        }
+        frameIndex = n;
+        drawFrame(latexFrames[frameIndex]);
+      }
+
+      function init() {
+        fetch("http://127.0.0.1:5000/")
+          .then(function(res) { return res.json(); })
+          .then(function(data) {
+            latexFrames = data;
+            frameIndex = 0;
+          });
+      }
+
+      window.ggbOnInit = function() {
+        ggbApplet = window.ggbApplet;
+        ggbApplet.setCoordSystem(0, 480, 0, 360);
+        init();
+      };
+
+      var params = {
+        appName: "graphing",
+        width: 900,
+        height: 700,
+        showToolBar: false,
+        showMenuBar: false,
+        showAlgebraInput: false,
+        enableRightClick: false,
+        enableShiftDragZoom: true,
+        useBrowserForJS: true
+      };
+      new GGBApplet(params, true).inject("ggb");
+    </script>
+  </body>
+</html>

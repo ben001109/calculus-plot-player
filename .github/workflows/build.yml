@@ -1,0 +1,58 @@
+name: Build
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch: {}
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install pyinstaller
+      - name: Build executables
+        shell: bash
+        run: |
+          if [ ! -f "frames.json" ]; then
+            echo "frames.json not found. Run: python3 build_frames.py"
+            exit 1
+          fi
+          pyinstaller --onefile --add-data "frames.json;." --add-data "index.html;." --add-data "geogebra.html;." --name "app_desmos" app_desmos.py
+          pyinstaller --onefile --add-data "frames.json;." --add-data "index.html;." --add-data "geogebra.html;." --name "app_geogebra" app_geogebra.py
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: dist/*
+
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install pyinstaller
+      - name: Build executables
+        run: |
+          if [ ! -f "frames.json" ]; then
+            echo "frames.json not found. Run: python3 build_frames.py"
+            exit 1
+          fi
+          pyinstaller --onefile --add-data "frames.json:." --add-data "index.html:." --add-data "geogebra.html:." --name "app_desmos" app_desmos.py
+          pyinstaller --onefile --add-data "frames.json:." --add-data "index.html:." --add-data "geogebra.html:." --name "app_geogebra" app_geogebra.py
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos
+          path: dist/*
